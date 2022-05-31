@@ -33,63 +33,22 @@
     */
 
 
-    // TODO: Standardise the naming scheme for readability
-    public record SearchRecord
-    {
-        public SearchRecord(string searchQuery)
-        {
-            this.searchQuery = searchQuery;
-        }
-
-        public SearchRecord(string searchQuery, int initialPosition)
-        {
-            this.searchQuery = searchQuery;
-            this.initialPosition = initialPosition;
-        }
-
-        public int initialPosition { get; set; }
-        public string searchQuery { get; init; }
-    }
-
-    public record SearchQuery
-    {
-        public SearchQuery(string searchSpace, string searchQuery)
-        {
-            this.searchSpace = searchSpace;
-            this.searchQuery = searchQuery;
-        }
-
-        public SearchQuery(string searchSpace, string searchQuery,
-                            int initialPosition, int finalPosition)
-        {
-            this.searchSpace = searchSpace;
-            this.searchQuery = searchQuery;
-            this.initialPosition = initialPosition;
-            this.finalPosition = finalPosition;
-        }
-
-        public int initialPosition { get; set; }
-        public int finalPosition { get; set; }
-        public string searchSpace { get; init; }
-        public string searchQuery { get; init; }
-    }
-
-    // ======================================================================
-
     public static class Search
     {
-        public static readonly string wildcardToken = @"\?";
+        public static readonly string WildcardToken = @"\?";
 
         // Returs a bool denoting whether the search query is contained in the search space
         public static bool ContainsString(SearchQuery search)
         {
-            for (int index = 0; index < search.searchSpace.Length; ++index)
+            
+            //TODO Use existing string operations to perform this search
+            for (int index = 0; index < search.SearchSpace.Length; ++index)
             {
-                var foundFirstCharOfSearchQuery = search.searchSpace[index] == search.searchQuery[0];
+                var foundFirstCharOfSearchQuery = search.SearchSpace[index] == search.SearchQuery[0];
                 if (foundFirstCharOfSearchQuery)
                 {
                     // Assert whether the current substring@Index matches the full search query
-                    if (AssertSearchInput(search.searchQuery, search.searchSpace, index))
+                    if (AssertSearchInput(search.SearchQuery, search.SearchSpace, index))
                     {
                         return true;
                     }
@@ -102,18 +61,19 @@
         // Returns a list of every occurrence of the search query that was found in the 'search space'
         public static List<SearchRecord> FindString(SearchQuery search)
         {
+            //TODO Use existing string operations to perform this search
             var recordList = new List<SearchRecord>();
 
-            for (int index = 0; index < search.searchSpace.Length; ++index)
+            for (int index = 0; index < search.SearchSpace.Length; ++index)
             {
                 // If we find the search queries first char in the search space
-                var foundFirstCharOfSearchQuery = search.searchSpace[index] == search.searchQuery[0];
+                var foundFirstCharOfSearchQuery = search.SearchSpace[index] == search.SearchQuery[0];
                 if (foundFirstCharOfSearchQuery)
                 {
                     // Assert whether the current substring@Index matches the full search query
-                    if (AssertSearchInput(search.searchQuery, search.searchSpace, index))
+                    if (AssertSearchInput(search.SearchQuery, search.SearchSpace, index))
                     {
-                        recordList.Add(new SearchRecord(search.searchQuery, index));
+                        recordList.Add(new SearchRecord(search.SearchQuery, index));
                     }
                 }
             }
@@ -129,13 +89,13 @@
             // PROBLEM: Should there be multiple instances (say n instances) of strings satisfying rule 1 at nearly the same position then
             //          it spawns multiple nearly identical results. If this occurs multiple times (say m times) for what would otherwise
             //          be a single result; then it would result in the query returning a crossproduct of n^m nearly identical results.
-            var listofQuerySubstrings = CutoutWildcard(search.searchQuery);
-            var searchSpace = search.searchSpace;
+            var listofQuerySubstrings = CutoutWildcard(search.SearchQuery);
+            var searchSpace = search.SearchSpace;
             var querySubstringCount = listofQuerySubstrings.Count();
 
             // Bail out fast on an empty search
             bool bailoutOnEmptySearchSpace = querySubstringCount == 0;
-            bool bailoutOnEmptyQuery = search.searchSpace.Length == 0;
+            bool bailoutOnEmptyQuery = search.SearchSpace.Length == 0;
             if (bailoutOnEmptySearchSpace || bailoutOnEmptyQuery) return new List<List<SearchRecord>>();
 
             // Get the first char of every substring query to simplify the search
@@ -161,7 +121,7 @@
                         if (AssertSearchInput(listofQuerySubstrings[searchQueryListIndex], searchSpace, searchSpaceIndex))
                         {
                             substringSearchRecords[searchQueryListIndex].Add(
-                            new SearchRecord(search.searchQuery, searchSpaceIndex));
+                            new SearchRecord(search.SearchQuery, searchSpaceIndex));
                         }
                     }
                 }
@@ -222,8 +182,8 @@
                     visitedSubstringRecordTable[visitedRecordIndex].ForEach(visit => hasVisitedAllSubstrings = hasVisitedAllSubstrings && visit);
                     if (hasVisitedAllSubstrings) return searchResults;
 
-                    int highestSubstring = substringSearchRecords[visitedRecordIndex].Min(val => val.initialPosition);
-                    var leastViableSubstring = substringSearchRecords[visitedRecordIndex].Where(val => val.initialPosition == highestSubstring).ToArray()[0]; // Cursed
+                    int highestSubstring = substringSearchRecords[visitedRecordIndex].Min(val => val.InitialPosition);
+                    var leastViableSubstring = substringSearchRecords[visitedRecordIndex].Where(val => val.InitialPosition == highestSubstring).ToArray()[0]; // Cursed
 
                     // The branching statements below initialized this variable at every path so it will never be null.
                     SearchRecord previousSubstringRecord = leastViableSubstring;
@@ -243,7 +203,7 @@
                     {
                         var currentRecord = substringSearchRecords[visitedRecordIndex][visitedSubstringIndex];
                         bool substringHasBeenVisited = visitedSubstringRecordTable[visitedRecordIndex][visitedSubstringIndex];
-                        bool substringRuleTwo = currentRecord.initialPosition >= previousSubstringRecord.initialPosition + previousSubstringRecord.searchQuery.Length;
+                        bool substringRuleTwo = currentRecord.InitialPosition >= previousSubstringRecord.InitialPosition + previousSubstringRecord.SearchQuery.Length;
                         if (substringHasBeenVisited) continue;
                         if (substringRuleTwo) bestSubstring = currentRecord;
 
@@ -267,10 +227,10 @@
 
         private static List<string> CutoutWildcard(string searchQuery)
         {
-            var wildcardTokenLength = wildcardToken.Length;
+            var wildcardTokenLength = WildcardToken.Length;
 
             // Find every wildcard in the searchQuery
-            var wildcardSearchRecord = new SearchQuery(searchQuery, wildcardToken);
+            var wildcardSearchRecord = new SearchQuery(searchQuery, WildcardToken);
             var wildcardTokens = FindString(wildcardSearchRecord);
 
             // Bailout fast in case there isn't a wildcard
@@ -282,8 +242,8 @@
             var result = new List<string>();
             foreach (var wildcardToken in wildcardTokens)
             {
-                result.Add(searchQuery.Substring(position, wildcardToken.initialPosition - position));
-                position += wildcardToken.initialPosition - position + wildcardTokenLength;
+                result.Add(searchQuery.Substring(position, wildcardToken.InitialPosition - position));
+                position += wildcardToken.InitialPosition - position + wildcardTokenLength;
             }
 
             // Edgecase: catching the last substring
