@@ -145,12 +145,6 @@
                 var previousRecord = substringSearchRecords[0][initialSubstringIndex];
                 var tempResult = new List<Token> { substringSearchRecords[0][initialSubstringIndex] };
                 visitedSubstringTable[0][initialSubstringIndex] = true;
-                Console.WriteLine("Initial Result");
-                tempResult.ForEach(elem =>
-                        Console.Write($"{elem.GetType().Name}:{{{elem.position}, {elem.value}}} ")
-                );
-                Console.Write('\n');
-
 
                 for (int substringIndex = 1; substringIndex < querySubstringCount; substringIndex++)
                 {
