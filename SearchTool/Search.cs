@@ -1,36 +1,12 @@
 ﻿namespace SearchTool
 {
-    // The search algorithms should make use of tree search paradimes rather than a
-    // recursive approach.
-
-    // DFS would probably work best to minimize overhead
-    // Sparse matrix representation for exploration and storage.
-
     // REFACTOR: Use string streams instead of strings (don't know if possible (should certainly be))
     // REFACTOR: Use tokens for quaries
-    /*
-    public record Query
-    {
-        public List<Token> Tokens { get; set; }
-        public string SearchSpace1 { get; set; }
-        public string SearchQuery1 { get; set; }
-    }
-
-    public record Token
-    {
-        public int InitialPosition { get; set; }
-        public string StringToken { get; set; }
-    }
-
-    public record StringToken : Token {}
-
-    public record WildcardToken : Token 
-    {
-        public int FinalPosition { get; set; }
-    }
-
-    // ------------------------------------------
-     */
+    // TODO: Standardise the naming scheme for readability
+    // TODO: Refactor til at bruge enumerators og movenext?
+    // TODO: Make it possible to search on wildcards found:
+    //      Given a search query with a wildcard: "query\?string{wildcard0}" then
+    //      it should be possible to use the wildcards found value in the search following it.
 
     /*
      * TODO Construct a more streamlined-for-use featureset
@@ -44,89 +20,60 @@
      *      options.GenericWildCardSearch(searchQuery);
      * });
      */
-    // TODO: Standardise the naming scheme for readability
-    // TODO: Refactor til at bruge enumerators og movenext?
 
-    public record SearchRecord
+    public record Query
     {
-        public SearchRecord(string searchQuery)
+        public Query(string searchSpace, string searchQuery)
         {
+            this.SearchSpace = searchSpace;
             this.searchQuery = searchQuery;
         }
 
-        public SearchRecord(string searchQuery, int initialPosition)
-        {
-            this.searchQuery = searchQuery;
-            this.initialPosition = initialPosition;
-        }
-
-        public int initialPosition { get; set; }
+        public string SearchSpace { get; init; }
         public string searchQuery { get; init; }
     }
 
-    public record SearchQuery
+    public abstract record Token
     {
-        public SearchQuery(string searchSpace, string searchQuery)
+        public Token(string value, int position)
         {
-            this.searchSpace = searchSpace;
-            this.searchQuery = searchQuery;
+            this.value = value;
+            this.position = position;
         }
 
-        public SearchQuery(string searchSpace, string searchQuery,
-                            int initialPosition, int finalPosition)
-        {
-            this.searchSpace = searchSpace;
-            this.searchQuery = searchQuery;
-            this.initialPosition = initialPosition;
-            this.finalPosition = finalPosition;
-        }
-
-        public int initialPosition { get; set; }
-        public int finalPosition { get; set; }
-        public string searchSpace { get; init; }
-        public string searchQuery { get; init; }
+        public string value { get; init; }
+        public int position { get; init; }
     }
 
-    // ======================================================================
+    public record RecordToken : Token
+    {
+        public RecordToken(string value, int position) : base(value, position) { }
+    }
+
+    public record WildcardToken : Token
+    {
+        public WildcardToken(string value, int position) : base(value, position) { }
+    }
 
     public static class Search
     {
         public static readonly string wildcardToken = @"\?";
 
-        // Returs a bool denoting whether the search query is contained in the search space
-        public static bool ContainsString(SearchQuery query)
-        {
-            for (int index = 0; index < query.searchSpace.Length; ++index)
-            {
-                var foundFirstCharOfSearchQuery = query.searchSpace[index] == query.searchQuery[0];
-                if (foundFirstCharOfSearchQuery)
-                {
-                    // Assert whether the current substring@Index matches the full search query
-                    if (AssertSearchInput(query.searchQuery, query.searchSpace, index))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
         // Returns a list of every occurrence of the search query that was found in the search space
-        public static List<SearchRecord> FindString(SearchQuery query)
+        public static List<Token> FindString(Query query)
         {
-            var recordList = new List<SearchRecord>();
+            var recordList = new List<Token>();
 
-            for (int index = 0; index < query.searchSpace.Length; ++index)
+            for (int index = 0; index < query.SearchSpace.Length; ++index)
             {
                 // If we find the search queries first char in the search space
-                var foundFirstCharOfSearchQuery = query.searchSpace[index] == query.searchQuery[0];
+                var foundFirstCharOfSearchQuery = query.SearchSpace[index] == query.searchQuery[0];
                 if (foundFirstCharOfSearchQuery)
                 {
                     // Assert whether the current substring@Index matches the full search query
-                    if (AssertSearchInput(query.searchQuery, query.searchSpace, index))
+                    if (AssertSearchInput(query.searchQuery, query.SearchSpace, index))
                     {
-                        recordList.Add(new SearchRecord(query.searchQuery, index));
+                        recordList.Add(new RecordToken(query.searchQuery, index));
                     }
                 }
             }
@@ -134,22 +81,7 @@
             return recordList;
         }
 
-        public static bool ContainsInstance(SearchQuery query)
-        {
-            return false;
-        }
-
-        public static SearchRecord FindFirstInstance(SearchQuery query)
-        {
-            return new SearchRecord("");
-        }
-
-        public static List<SearchRecord> FindEveryInstance(SearchQuery query)
-        {
-            return new List<SearchRecord>();
-        }
-
-        public static List<List<SearchRecord>> GenericWildcardSearch(SearchQuery query)
+        public static List<List<Token>> GenericWildcardSearch(Query query)
         {
             /* Making a generic wildcard search over [n] substrings and [n-1] wildcards requires that:
              *  - Rule 1: Each querying substring must exist for the complete search to be viable.
@@ -162,21 +94,13 @@
              */
             // ============================ PART 1 ============================
             var listofQuerySubstrings = CutoutWildcard(query.searchQuery);
-            var searchSpace = query.searchSpace;
+            var searchSpace = query.SearchSpace;
             var querySubstringCount = listofQuerySubstrings.Count();
 
             // Bail out fast on an empty search
             bool bailoutOnEmptySearchSpace = querySubstringCount == 0;
-            bool bailoutOnEmptyQuery = query.searchSpace.Length == 0;
-            if (bailoutOnEmptySearchSpace || bailoutOnEmptyQuery) return new List<List<SearchRecord>>();
-
-            // ===================== DEBUG =====================
-            Console.WriteLine("Part 1: found {0} query substrings:", querySubstringCount);
-            listofQuerySubstrings.ForEach(querySubstring =>
-            {
-                Console.Write("{0} ", querySubstring);
-            });
-            Console.Write('\n');
+            bool bailoutOnEmptyQuery = query.SearchSpace.Length == 0;
+            if (bailoutOnEmptySearchSpace || bailoutOnEmptyQuery) return new List<List<Token>>();
 
             // ============================ PART 2 ============================
             // 
@@ -187,46 +111,7 @@
             foreach (var sr in substringSearchRecords)
             {
                 bool foundNoViableQueryResult = substringSearchRecords[0].Count == 0;
-                if (foundNoViableQueryResult) return new List<List<SearchRecord>>();
-            }
-
-            // ===================== DEBUG =====================
-            Console.WriteLine("Part 2: found {0} substrings occurences:", substringSearchRecords.ToList().ConvertAll(list => list.Count()).Sum());
-            var occurenceCount = substringSearchRecords.ToList().ConvertAll(list => list.Count());
-            var largestAmountOfOccurences = occurenceCount.Max();
-            var listOfLatestOccurences = new int[substringSearchRecords.Count()];
-            for (int substringIndex = 0; substringIndex < querySubstringCount; substringIndex++)
-            {
-                for (int occurenceIndex = 0; occurenceIndex < substringSearchRecords[substringIndex].Count(); occurenceIndex++)
-                {
-                    var resultString = String.Format("{{\"{0}\", {1}}} ",
-                                        substringSearchRecords[substringIndex][occurenceIndex].searchQuery,
-                                        substringSearchRecords[substringIndex][occurenceIndex].initialPosition);
-                    bool currentResultIsLarger = resultString.Length > listOfLatestOccurences[substringIndex];
-                    if (currentResultIsLarger)
-                        listOfLatestOccurences[substringIndex] = resultString.Length;
-                }
-            }
-
-            for (int occurenceIndex = 0; occurenceIndex < largestAmountOfOccurences; occurenceIndex++)
-            {
-                for (int substringIndex = 0; substringIndex < querySubstringCount; substringIndex++)
-                {
-                    bool thereIsAnOccurenceToPrint = occurenceIndex < occurenceCount[substringIndex];
-                    if (thereIsAnOccurenceToPrint)
-                    {
-                        var resultString = String.Format("{{\"{0}\", {1}}} ",
-                                        substringSearchRecords[substringIndex][occurenceIndex].searchQuery,
-                                        substringSearchRecords[substringIndex][occurenceIndex].initialPosition);
-                        var padding = new String(' ', listOfLatestOccurences[substringIndex] - resultString.Length);
-                        Console.Write(padding + resultString);
-                    }
-                    else
-                    {
-                        Console.Write(new String(' ', listOfLatestOccurences[substringIndex]));
-                    }
-                }
-                Console.Write('\n');
+                if (foundNoViableQueryResult) return new();
             }
 
             // ============================ PART 3 ============================
@@ -247,7 +132,7 @@
             {
                 visitedSubstringTable[listIndex] = new bool[substringSearchRecords[listIndex].Count()];
             }
-            var searchResults = new List<List<SearchRecord>>();
+            var searchResults = new List<List<Token>>();
 
             // NOTE: is it smarter to do a conditional-and-continue or a conditional-to-codeblock
             // Worst case each initial substring constructs a result so interate over all of them
@@ -258,8 +143,14 @@
                     continue;
 
                 var previousRecord = substringSearchRecords[0][initialSubstringIndex];
-                var tempResult = new List<SearchRecord> { substringSearchRecords[0][initialSubstringIndex] };
+                var tempResult = new List<Token> { substringSearchRecords[0][initialSubstringIndex] };
                 visitedSubstringTable[0][initialSubstringIndex] = true;
+                Console.WriteLine("Initial Result");
+                tempResult.ForEach(elem =>
+                        Console.Write($"{elem.GetType().Name}:{{{elem.position}, {elem.value}}} ")
+                );
+                Console.Write('\n');
+
 
                 for (int substringIndex = 1; substringIndex < querySubstringCount; substringIndex++)
                 {
@@ -271,78 +162,58 @@
                         visitedSubstringTable[substringIndex][occurenceIndex] = true;
 
                         var currentSubstringRecord = substringSearchRecords[substringIndex][occurenceIndex];
-                        Console.WriteLine($"assert for {{{previousRecord.searchQuery}, {currentSubstringRecord.searchQuery}}} | prev pos:{previousRecord.initialPosition}, prev len:{previousRecord.searchQuery.Length}, curr pos:{currentSubstringRecord.initialPosition}");
-                        bool currentSubstringIsViable = previousRecord.initialPosition + previousRecord.searchQuery.Length < currentSubstringRecord.initialPosition;
+                        bool currentSubstringIsViable = previousRecord.position + previousRecord.value.Length < currentSubstringRecord.position;
                         if (currentSubstringIsViable)
                         {
+                            var previousRecordEndPosition = previousRecord.position + previousRecord.value.Length;
+                            bool thereExistAWildcard = currentSubstringRecord.position - previousRecordEndPosition > 0;
+                            if (thereExistAWildcard)
+                            {
+                                var wildcard = new WildcardToken(
+                                    searchSpace.Substring(previousRecordEndPosition, currentSubstringRecord.position - previousRecordEndPosition),
+                                    previousRecordEndPosition);
+                                tempResult.Add(wildcard);
+                            }
                             tempResult.Add(currentSubstringRecord);
+
                             previousRecord = currentSubstringRecord;
-                            UpdateVisitedTable(ref visitedSubstringTable, ref substringSearchRecords, currentSubstringRecord.initialPosition);
+                            UpdateVisitedTable(ref visitedSubstringTable, ref substringSearchRecords, currentSubstringRecord.position);
                             break;
                         }
                     }
                 }
 
-                bool aCompleteResultWasFound = tempResult.Count() == querySubstringCount;
+                // Assert that finding the last query substring is equivalent to finding a complete result
+                bool aCompleteResultWasFound = tempResult.Last().value == listofQuerySubstrings.Last();
                 if (aCompleteResultWasFound)
                     searchResults.Add(tempResult);
             }
-
-            /* ============================================= Structure ================================================
-             * Given:
-             *     - substringList:   An ordered list of query substrings.
-             *     - arrayList:       An array of lists where each array index coincides with a substring and where the 
-             *                        list contains every occurence of the substring ordered after when it's found in the 
-             *                        searchSpace.
-             *     - arrayArray:      An arrar of arrays containing bools where each index corresponds with a substring 
-             *                        denothing whether, during the running of the algorithm, a substring was visited.
-             *     - initialPosition: The position of each substring in the SearchSpace.
-             * 
-             * |Iterate over each index of the subtringList as substringListIndex and
-             * |    Iterate over each index of the substringList[substringListindex] as substringOccurenceIndex and
-             * |        Find the first substringOccurence where:
-             * |            - It hasen't been recorded as visited in arrayArray,
-             * |            - It's initial position is greater than the initial position of the previous index +
-             * |              the length of the previously chosen substring.
-             * 
-             * 
-             * ========================================================================================================
-             */
-
-            // ===================== DEBUG =====================
-            Console.WriteLine("Part 3: found {0} results:", searchResults.Count());
-            searchResults.ForEach(searchList =>
-            {
-                var accumulator = "";
-                searchList.ForEach(element => accumulator += $"{{{element.searchQuery}, {element.initialPosition}}}");
-                Console.WriteLine(accumulator);
-            });
 
             return searchResults;
         }
 
         // Since A new record has been visited then it's possible that other substring occurences have been made unviable.
-        private static void UpdateVisitedTable(ref bool[][] visitedSubstringTable, ref List<SearchRecord>[] searchRecords, int updatedPosition)
+        private static void UpdateVisitedTable(ref bool[][] visitedSubstringTable, ref List<Token>[] searchRecords, int updatedPosition)
         {
             for (int substringIndex = 0; substringIndex < visitedSubstringTable.Count(); substringIndex++)
             {
                 for (int occurenceIndex = 0; occurenceIndex < visitedSubstringTable[substringIndex].Count(); occurenceIndex++)
                 {
                     // This makes a lot of wasted work, but a viable improvement requires an improved matrix datastructure.
-                    bool substringNoLongerViable = searchRecords[substringIndex][occurenceIndex].initialPosition < updatedPosition;
+                    bool substringNoLongerViable = searchRecords[substringIndex][occurenceIndex].position < updatedPosition;
                     visitedSubstringTable[substringIndex][occurenceIndex] = substringNoLongerViable;
                 }
             }
         }
 
-        private static List<SearchRecord>[] PopulateSearchRecords(string searchSpace, List<string> listofQuerySubstrings)
+        private static List<Token>[] PopulateSearchRecords(string searchSpace, List<string> listofQuerySubstrings)
         {
             var firstCharOfEachQuery = (from queries in listofQuerySubstrings select queries[0]).ToArray();
-            var substringSearchRecords = new List<SearchRecord>[listofQuerySubstrings.Count()];
-            substringSearchRecords.Distinct<List<SearchRecord>>();
+            var substringSearchRecords = new List<Token>[listofQuerySubstrings.Count()];
+            substringSearchRecords.Distinct<List<Token>>();
             for (int index = 0; index < listofQuerySubstrings.Count(); index++)
             {
-                substringSearchRecords[index] = new List<SearchRecord>();
+                substringSearchRecords[index] = new List<Token>();
             }
 
             for (int searchSpaceIndex = 0; searchSpaceIndex < searchSpace.Length; searchSpaceIndex++)
@@ -357,7 +228,7 @@
                         // TODO: This opens the door for 2 viable near-identical strings, where one is concatenated with a suffix, to both be accepted at the same positions.
                         if (AssertSearchInput(listofQuerySubstrings[querySubstringListIndex], searchSpace, searchSpaceIndex))
                         {
-                            substringSearchRecords[querySubstringListIndex].Add(new SearchRecord(listofQuerySubstrings[querySubstringListIndex], searchSpaceIndex));
+                            substringSearchRecords[querySubstringListIndex].Add(new RecordToken(listofQuerySubstrings[querySubstringListIndex], searchSpaceIndex));
                         }
                     }
                 }
@@ -365,21 +236,15 @@
 
             return substringSearchRecords;
         }
-
-        public static List<SearchRecord> SemanticWildcardSearch(SearchQuery search)
-        {
-            return new List<SearchRecord>();
-        }
-
         private static List<string> CutoutWildcard(string searchQuery)
         {
             // Find every wildcard in the searchQuery
-            var wildcardSearchRecord = new SearchQuery(searchQuery, wildcardToken);
+            var wildcardSearchRecord = new Query(searchQuery, wildcardToken);
             var wildcardTokens = FindString(wildcardSearchRecord);
 
             // Bailout fast in case there isn't a wildcard
             bool thereIsNoWildcard = wildcardTokens.Count == 0;
-            if (thereIsNoWildcard) return new List<string> { searchQuery };
+            if (thereIsNoWildcard) return new() { searchQuery };
 
             // Split the searchQuery up using the wildcard(s) position(s).
             int position = 0;
@@ -387,8 +252,8 @@
             var result = new List<string>();
             foreach (var wildcardToken in wildcardTokens)
             {
-                result.Add(searchQuery.Substring(position, wildcardToken.initialPosition - position));
-                position += wildcardToken.initialPosition - position + wildcardTokenLength;
+                result.Add(searchQuery.Substring(position, wildcardToken.position - position));
+                position += wildcardToken.position - position + wildcardTokenLength;
             }
 
             // Edgecase: catching the last substring
